@@ -12,8 +12,7 @@ LIN Interface
 
 */
 
-#include <Arduino.h>
-#include <SoftwareSerial.h>
+
 #include <Hella_IBS_200.h>
 
 // LIN serial Interface

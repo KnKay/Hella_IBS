@@ -4,6 +4,11 @@
 
   ToDo:
 */
+
+#include <Arduino.h>
+#include <SoftwareSerial.h>
+
+
 #ifndef Hella_IBS_200_h
 #define Hella_IBS_200_h
 
