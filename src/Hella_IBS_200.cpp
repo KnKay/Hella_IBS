@@ -275,7 +275,7 @@ void readFrame(byte mID)
     { // read serial
     //We need to get rid of the Echo! 
     linSerial.read();
-    linSerial.read();
+    
         while (linSerial.available())
         {
             LinMessageA[ix] = linSerial.read();
@@ -412,7 +412,7 @@ BatteryDataStruct  IBS_LIN_Read(int IBS_SensorNo)
     //soc = (AvCap/(80*soh/100))*100;         // Anzeige der eigentlichen Restkapazität im Battsymbol
 
     //    int soc soh remTime    float Ubatt Ibatt Btemp AvCap
-    /*
+    
         Serial.begin(115200);
         Serial.println("IBS Data: ");
         Serial.print("I: ");
@@ -429,7 +429,7 @@ BatteryDataStruct  IBS_LIN_Read(int IBS_SensorNo)
         Serial.println(ret.soc);        
         Serial.flush();
         Serial.end();
-    */
+    
     Serial.begin(115200);
     return ret;
 }
