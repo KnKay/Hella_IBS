@@ -12,7 +12,6 @@
 #ifndef Hella_IBS_200_h
 #define Hella_IBS_200_h
 
-#define PIN_MPC_CS D8
 #define PIN_MPC_TX D7
 #define PIN_MPC_RX D6
 
@@ -24,6 +23,11 @@
 #define BAT_TYPE_STARTER 1 //BatTyps
 #define BAT_TYPE_GEL 2
 #define BAT_TYPE_AGM 3
+
+#define HELLA_DEBUG false
+
+extern boolean hella_debug;
+extern boolean hella_info;
 
 /*
   Der Code nutzt Sensor 1. Für Sensor 2 müssen einfach andere Frame ID´s genutzt werden. 

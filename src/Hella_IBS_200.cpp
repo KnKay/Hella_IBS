@@ -30,13 +30,19 @@ SoftwareSerial linSerial(rxPin1, txPin1); // RX, TX
 
 // Configuration
 boolean outputSerial = true; // true if json output to serial, false if only display
-boolean debug = true;        // Debug output UART
 
 // Global Variables
 byte LinMessage[9] = {0};
 byte LinMessageA[200] = {0};
 boolean linSerialOn = 0;
 
+/*
+  Der Code nutzt Sensor 1. Für Sensor 2 müssen einfach andere Frame ID´s genutzt werden. 
+  Hier ist die entsprechende Übersetzungsliste:
+
+  Frame ID Typ 1   | 0x11 |   | 0x21 |   | 0x22 |   | 0x23 |   | 0x24 |   | 0x25 |   | 0x26
+  Frame ID Typ 2   | 0x12 |   | 0x27 |   | 0x28 |   | 0x29 |   | 0x2A |   | 0x2B |   | 0x2C
+  */
 //                   0     1     2     3     4     5     6     7
 byte FrameID1[2][7] = {{0x11, 0x21, 0x22, 0x23, 0x24, 0x25, 0x26},
                        {0x12, 0x27, 0x28, 0x29, 0x2A, 0x2B, 0x2C}};
@@ -48,17 +54,22 @@ void serialBreak();
 byte LINChecksum(int nByte);
 byte addIDParity(byte linID);
 
+boolean hella_debug = HELLA_DEBUG;
+boolean hella_info = hella_debug;
+
 //-----------------------------------------------------------------------------------------------------------------
 void IBS_LIN_Setup(byte BatTyp, byte cap, byte csPin)
 {
     pinMode(csPin, OUTPUT); // CS Signal LIN Tranceiver
     digitalWrite(csPin, HIGH);
-
-    Serial.println("-------------------------------------------------------------");
-    Serial.println("> Setting up serial LIN communication");
-    Serial.flush();
-    Serial.end();
-    delay(50);
+    if (hella_debug) {
+        Serial.println("-------------------------------------------------------------");
+        Serial.println("> Setting up serial LIN communication");
+        Serial.flush();
+        // Serial.end();
+        delay(50);
+    }
+    
 
     IBS_LIN_setNomCap(cap, csPin);    //Normkapazität parametrieren (7AH)
     IBS_LIN_setBatTyp(BatTyp, csPin); //Batterietyp setzen
@@ -182,7 +193,6 @@ void readFrame(byte mID)
     { // read serial
     //We need to get rid of the Echo! 
     linSerial.read();
-    
         while (linSerial.available())
         {
             LinMessageA[ix] = linSerial.read();
@@ -193,21 +203,23 @@ void readFrame(byte mID)
             }
         }
     }
-    Serial.begin(115200);
-    delay(50);
-    Serial.print("ID: ");
-    Serial.print(linID, HEX);
-    Serial.print(" --> ");
-    Serial.print(mID, HEX);
-    Serial.print(": ");
-    for (int ixx = 0; ixx < 9; ixx++)
-    {
-        Serial.print(LinMessageA[ixx], HEX);
-        Serial.print(":");
+    if (hella_debug) {
+        Serial.begin(115200);
+        delay(50);
+        Serial.print("ID: ");
+        Serial.print(linID, HEX);
+        Serial.print(" --> ");
+        Serial.print(mID, HEX);
+        Serial.print(": ");
+        for (int ixx = 0; ixx < 9; ixx++)
+        {
+            Serial.print(LinMessageA[ixx], HEX);
+            Serial.print(":");
+        }
+        Serial.println("  Lesen Ende");
+        Serial.flush();
+        // Serial.end();
     }
-    Serial.println("  Lesen Ende");
-    Serial.flush();
-    Serial.end();
     delay(100);
 }
 
@@ -309,10 +321,12 @@ BatteryDataStruct  IBS_LIN_Read(int IBS_SensorNo, byte csPin)
     // readFrame(0x2A);
     readFrame(FrameID1[IBS_SENSOR][IBS_FRM_tb3]);
     digitalWrite(csPin, LOW);
-    soc = (AvCap/(80*soh/100))*100;         // Anzeige der eigentlichen Restkapazität im Battsymbol
+    
+    
+    ret.soc = (ret.AvCap/(80*ret.soh/100))*100;         // Anzeige der eigentlichen Restkapazität im Battsymbol
 
     //    int soc soh remTime    float Ubatt Ibatt Btemp AvCap
-    
+    if (hella_info || hella_debug) {
         Serial.begin(115200);
         Serial.println("IBS Data: ");
         Serial.print("I: ");
@@ -328,8 +342,7 @@ BatteryDataStruct  IBS_LIN_Read(int IBS_SensorNo, byte csPin)
         Serial.print("soc");
         Serial.println(ret.soc);        
         Serial.flush();
-        Serial.end();
-    
-    Serial.begin(115200);
+        // Serial.end();
+    }
     return ret;
 }
