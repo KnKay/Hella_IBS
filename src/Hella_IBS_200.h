@@ -52,13 +52,12 @@ struct BatteryDataStruct{
 };
 
 
-void IBS_LIN_Setup(byte BatTyp, byte cap);
-void IBS_LIN_Read(char *json_message, int IBS_SensorNo);
-void IBS_LIN_setNomCap(byte cap);
-void IBS_LIN_setBatTyp(byte BatTyp);
+void IBS_LIN_Setup(byte BatTyp, byte cap, byte csPin);
+void IBS_LIN_setNomCap(byte cap, byte csPin);
+void IBS_LIN_setBatTyp(byte BatTyp, byte csPin);
 
-BatteryDataStruct  IBS_LIN_Read(int IBS_SensorNo);
+BatteryDataStruct  IBS_LIN_Read(int IBS_SensorNo, byte csPin);
 
-
+//digitalWrite(csPin, HIGH);
 
 #endif

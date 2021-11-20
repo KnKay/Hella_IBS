@@ -19,7 +19,7 @@ LIN Interface
 int serSpeed = LIN_SERIAL_SPEED;    // speed LIN
 int breakDuration = LIN_BREAK_BITS; // number of bits break signal
 
-int linCSPin = PIN_MPC_CS; // CS Pin
+//int linCSPin = PIN_MPC_CS; // CS Pin
 int txPin1 = PIN_MPC_TX;   // TX Pin LIN serial
 int rxPin1 = PIN_MPC_RX;   // RX Pin LIN serial
 
@@ -41,17 +41,18 @@ boolean linSerialOn = 0;
 byte FrameID1[2][7] = {{0x11, 0x21, 0x22, 0x23, 0x24, 0x25, 0x26},
                        {0x12, 0x27, 0x28, 0x29, 0x2A, 0x2B, 0x2C}};
 
+void sendMessage(byte mID, int nByte);
 void readFrame(byte mID);
 void serialBreak();
-void sendMessage(byte mID, int nByte);
+
 byte LINChecksum(int nByte);
 byte addIDParity(byte linID);
 
 //-----------------------------------------------------------------------------------------------------------------
-void IBS_LIN_Setup(byte BatTyp, byte cap)
+void IBS_LIN_Setup(byte BatTyp, byte cap, byte csPin)
 {
-    pinMode(linCSPin, OUTPUT); // CS Signal LIN Tranceiver
-    digitalWrite(linCSPin, HIGH);
+    pinMode(csPin, OUTPUT); // CS Signal LIN Tranceiver
+    digitalWrite(csPin, HIGH);
 
     Serial.println("-------------------------------------------------------------");
     Serial.println("> Setting up serial LIN communication");
@@ -59,17 +60,17 @@ void IBS_LIN_Setup(byte BatTyp, byte cap)
     Serial.end();
     delay(50);
 
-    IBS_LIN_setNomCap(cap);    //Normkapazität parametrieren (7AH)
-    IBS_LIN_setBatTyp(BatTyp); //Batterietyp setzen
+    IBS_LIN_setNomCap(cap, csPin);    //Normkapazität parametrieren (7AH)
+    IBS_LIN_setBatTyp(BatTyp, csPin); //Batterietyp setzen
 
     linSerial.begin(serSpeed);
     linSerialOn = 1;
+    digitalWrite(csPin, LOW);
 } // end of function
 
 //-----------------------------------------------------------------------------------------------------------------
-void IBS_LIN_setNomCap(byte cap)
+void IBS_LIN_setNomCap(byte cap, byte csPin)
 {
-
     byte i = 0;
 
     LinMessage[0] = 0x00;
@@ -86,6 +87,7 @@ void IBS_LIN_setNomCap(byte cap)
 
     LinMessage[0] = 0x3c;
 
+    digitalWrite(csPin, HIGH);
     serialBreak();
     linSerial.write(0x55); // Sync
     while (i < 9)
@@ -95,10 +97,11 @@ void IBS_LIN_setNomCap(byte cap)
     }
     linSerial.write(cksum);
     linSerial.flush();
+    digitalWrite(csPin, LOW);
 } // end of function
 
 //-----------------------------------------------------------------------------------------------------------------
-void IBS_LIN_setBatTyp(byte BatTyp)
+void IBS_LIN_setBatTyp(byte BatTyp, byte csPin)
 {
 
     byte i = 0;
@@ -112,7 +115,7 @@ void IBS_LIN_setBatTyp(byte BatTyp)
     LinMessage[6] = 0xff;
     LinMessage[7] = 0xff;
     LinMessage[8] = 0xff;
-
+    digitalWrite(csPin, HIGH);
     switch (BatTyp)
     {
 
@@ -158,104 +161,8 @@ void IBS_LIN_setBatTyp(byte BatTyp)
         linSerial.flush();
         break;
     }
+    digitalWrite(csPin, LOW);
 } // end of function
-
-//-----------------------------------------------------------------------------------------------------------------
-void IBS_LIN_Read(char *json_message, int IBS_SensorNo)
-{
-    int soc;
-    int soh;
-    float Ubatt;
-    float Ibatt;
-    float Btemp;
-    float AvCap;
-    int remTime = 0;
-
-    if (IBS_SensorNo == 1)
-        IBS_SENSOR = 0;
-    else
-        IBS_SENSOR = 1;
-
-    LinMessageA[0] = 0x01;
-    while (bitRead(LinMessageA[0], 0) > 0)
-    {
-        // readFrame(0x27);
-        readFrame(FrameID1[IBS_SENSOR][IBS_FRM_tb2]);
-    }
-
-    // Read Frame IBS_FRM 2 - Current Values
-
-    // readFrame(0x28);
-    readFrame(FrameID1[IBS_SENSOR][IBS_FRM_CUR]);
-
-    Ubatt = (float((LinMessageA[4] << 8) + LinMessageA[3])) / 1000;
-    Ibatt = (float((long(LinMessageA[2]) << 16) + (long(LinMessageA[1]) << 8) + long(LinMessageA[0]) - 2000000L)) / 1000;
-    Btemp = long(LinMessageA[5]) / 2 - 40;
-
-    // Read Frame IBS_FRM 3 - Error Values
-    // readFrame(0x29);
-    readFrame(FrameID1[IBS_SENSOR][IBS_FRM_ERR]);
-
-    // Read Frame IBS_FRM 5
-    // readFrame(0x2B);
-    readFrame(FrameID1[IBS_SENSOR][IBS_FRM_SOx]);
-
-    soc = int(LinMessageA[0]) / 2;
-    soh = int(LinMessageA[1]) / 2;
-
-    // Read Frame IBS_FRM 6
-    // readFrame(0x2C);
-    readFrame(FrameID1[IBS_SENSOR][IBS_FRM_CAP]);
-
-    AvCap = (float((LinMessageA[3] << 8) + LinMessageA[2])) / 10; //Dischargeable Capacity
-    int Calib = bitRead(LinMessageA[5], 0);
-    remTime = 0;
-
-    // Read Frame 4
-    // readFrame(0x2A);
-    readFrame(FrameID1[IBS_SENSOR][IBS_FRM_tb3]);
-
-    //soc = (AvCap/(80*soh/100))*100;         // Anzeige der eigentlichen Restkapazität im Battsymbol
-
-    //    int soc soh remTime    float Ubatt Ibatt Btemp AvCap
-
-    // Output json String to serial
-    // %d signed int; %f float; %8.2f: 8 Stellen, 2 Nachkomma
-    sprintf(json_message, "{\"current\":{\"ubat\":\"%4.2f\",\"icurr\":\"%4.3f\",\"soc\":\"%d\",\"time\":\"%d\",\"avcap\":\"%3.1f\"},\"Akku\":{\"soh\":\"%d\",\"temp\":\"%4.2f\"}}",
-            Ubatt, Ibatt, soc, remTime, AvCap, soh, Btemp);
-
-    if (outputSerial)
-    {
-        Serial.begin(115200);
-        delay(100);
-
-        Serial.println("json_message:");
-        Serial.println(json_message);
-
-        /*
-        Serial.print("{\"current\":{\"ubat\":\"");
-        Serial.print(Ubatt, 2);
-        Serial.print("\",\"icurr\":\"");
-        Serial.print(Ibatt, 3);
-        Serial.print("\",\"soc\":\"");
-        Serial.print(soc);
-        Serial.print("\",\"time\":\"");
-        Serial.print(remTime);
-        Serial.print("\",\"avcap\":\"");
-        Serial.print(AvCap, 1);
-        Serial.print("\"},\"Akku\":{\"soh\":\"");
-        Serial.print(soh);
-        Serial.print("\",\"temp\":\"");
-        Serial.print(Btemp);
-        Serial.println("\"}}");
-        Serial.flush();
-        Serial.end();
-    */
-        delay(100);
-    }
-
-    delay(2000);
-} // end of function loop
 
 //-----------------------------------------------------------------------------------------------------------------
 // Read answer from Lin bus
@@ -264,7 +171,7 @@ void readFrame(byte mID)
     memset(LinMessageA, 0, sizeof(LinMessageA));
     int ix = 0;
     byte linID = mID & 0x3F | addIDParity(mID);
-
+    
     serialBreak();
     linSerial.flush();
     linSerial.write(0x55);  // Sync
@@ -305,14 +212,6 @@ void readFrame(byte mID)
 }
 
 //-----------------------------------------------------------------------------------------------------------------
-// Generate Break signal LOW on LIN bus
-void serialBreak_old()
-{
-    // delay(1000 / serSpeed * breakDuration); // duration break time pro bit in milli seconds * number of bit for break
-    delayMicroseconds(1000000 / serSpeed * breakDuration);
-}
-
-//-----------------------------------------------------------------------------------------------------------------
 void serialBreak()
 {
     //  if (linSerialOn == 1) linSerial.end();
@@ -328,7 +227,6 @@ void serialBreak()
 //-----------------------------------------------------------------------------------------------------------------
 void sendMessage(byte mID, int nByte)
 {
-
     byte cksum = LINChecksum(nByte);
     byte linID = mID & 0x3F | addIDParity(mID);
     serialBreak();
@@ -361,9 +259,11 @@ byte addIDParity(byte linID)
 
 
 
-BatteryDataStruct  IBS_LIN_Read(int IBS_SensorNo)
+BatteryDataStruct  IBS_LIN_Read(int IBS_SensorNo, byte csPin)
 {
 //Adopt the get Method...
+
+    digitalWrite(csPin, HIGH);
 
     if (IBS_SensorNo == 1)
         IBS_SENSOR = 0;
@@ -408,8 +308,8 @@ BatteryDataStruct  IBS_LIN_Read(int IBS_SensorNo)
     // Read Frame 4
     // readFrame(0x2A);
     readFrame(FrameID1[IBS_SENSOR][IBS_FRM_tb3]);
-
-    //soc = (AvCap/(80*soh/100))*100;         // Anzeige der eigentlichen Restkapazität im Battsymbol
+    digitalWrite(csPin, LOW);
+    soc = (AvCap/(80*soh/100))*100;         // Anzeige der eigentlichen Restkapazität im Battsymbol
 
     //    int soc soh remTime    float Ubatt Ibatt Btemp AvCap
     
